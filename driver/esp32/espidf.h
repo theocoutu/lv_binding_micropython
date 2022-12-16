@@ -80,6 +80,14 @@ void * memset ( void * ptr, int value, size_t num );
 
 #include "soc/i2s_reg.h" // for SPH0645_WORKAROUND
 
+// macro mapping for the ESP32-S3, ESP32-C3 and ESP32-H2. These macros
+// have different names for those MCUs
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32H2
+    #define I2S_TIMING_REG I2S_TX_TIMING_REG
+    #define I2S_CONF_REG I2S_TX_CONF_REG
+#endif
+
+
 static inline void SPH0645_WORKAROUND(int i2s_num)
 {
     REG_SET_BIT( I2S_TIMING_REG(i2s_num), BIT(9));
@@ -118,6 +126,12 @@ static inline void get_ccount(int *ccount)
 #   include "esp_clk.h"
 #endif
 
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32H2
+    #ifdef SOC_GPIO_SUPPORT_FORCE_HOLD
+        #undef SOC_GPIO_SUPPORT_FORCE_HOLD
+    #endif
+#endif
+
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
 #include "esp_heap_caps.h"
@@ -128,6 +142,15 @@ static inline void get_ccount(int *ccount)
 #include "mdns.h"
 #include "esp_http_client.h"
 #include "sh2lib.h"
+
+
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32H2
+    #define SPI_HOST    SPI1_HOST
+    #define HSPI_HOST   SPI2_HOST
+    #define VSPI_HOST   SPI3_HOST
+
+#endif
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Helper function to register HTTP event handler

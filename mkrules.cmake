@@ -66,7 +66,30 @@ function(lv_bindings)
         set(LV_PP_FILTERED ${LV_PP})
     endif()
 
-    add_custom_command(
+
+
+    if(ESP_PLATFORM)
+        add_custom_command(
+            OUTPUT
+                ${LV_OUTPUT}.out
+            COMMAND
+                ${Python3_EXECUTABLE} ${LV_BINDINGS_DIR}/gen/gen_mpy.py ${LV_GEN_OPTIONS} -MD ${LV_MPY_METADATA} -E ${LV_PP_FILTERED} ${LV_INPUT} > ${LV_OUTPUT}.out || (rm -f ${LV_OUTPUT}.out && /bin/false)
+            DEPENDS
+                ${LV_BINDINGS_DIR}/gen/gen_mpy.py
+                ${LV_PP_FILTERED}
+            COMMAND_EXPAND_LISTS
+        )
+        add_custom_command(
+            OUTPUT
+                ${LV_OUTPUT}
+            COMMAND
+                ${Python3_EXECUTABLE} ${LV_BINDINGS_DIR}/driver/esp32/parse_lv_idf.py ${LV_OUTPUT}.out
+            DEPENDS
+                ${LV_BINDINGS_DIR}/driver/esp32/parse_lv_idf.py
+                ${LV_OUTPUT}.out
+        )
+    else()
+        add_custom_command(
         OUTPUT
             ${LV_OUTPUT}
         COMMAND
@@ -76,7 +99,7 @@ function(lv_bindings)
             ${LV_PP_FILTERED}
         COMMAND_EXPAND_LISTS
     )
-
+    endif()
 endfunction()
 
 # Definitions for specific bindings
@@ -128,6 +151,15 @@ function(all_lv_bindings)
                 soc/sens_struct.h
                 soc/rtc.h
                 driver/periph_ctrl.h
+                esp_eth/include/esp_eth.h
+                esp_eth/include/esp_eth_netif_glue.h
+                esp_eth/include/esp_eth_phy.h
+                esp_eth/include/esp_eth_com.h
+                esp_eth/include/esp_eth_mac.h
+                esp_eth/include/eth_phy_regs_struct.h
+                freertos/FreeRTOSConfig_arch.h
+                rom/lldesc.h
+                driver/rtc_io.h
         )
     endif(ESP_PLATFORM)
 

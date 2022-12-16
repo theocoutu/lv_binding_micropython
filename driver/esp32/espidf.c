@@ -13,7 +13,6 @@
 
 // ESP IDF has some functions that are declared but not implemented.
 // To avoid linking errors, provide empty implementation
-
 inline void gpio_pin_wakeup_disable(void){}
 inline void gpio_pin_wakeup_enable(uint32_t i, GPIO_INT_TYPE intr_state){}
 inline void gpio_intr_ack_high(uint32_t ack_mask){}
@@ -22,6 +21,12 @@ inline uint32_t gpio_intr_pending_high(void){return 0;}
 inline uint32_t gpio_intr_pending(void){return 0;}
 inline void gpio_intr_handler_register(gpio_intr_handler_fn_t fn, void *arg){}
 inline void gpio_init(void){}
+
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32H2
+    inline uint32_t gpio_input_get_high(void){return 0;}
+    inline void gpio_output_set_high(uint32_t set_mask, uint32_t clear_mask, uint32_t enable_mask, uint32_t disable_mask){}
+#endif
+
 
 void task_delay_ms(int ms)
 {
