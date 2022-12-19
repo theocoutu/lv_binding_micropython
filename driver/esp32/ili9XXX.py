@@ -573,7 +573,7 @@ class ili9341(ili9XXX):
 
     def __init__(self,
         miso=5, mosi=18, clk=19, cs=13, dc=12, rst=4, power=14, backlight=15, backlight_on=0, power_on=0,
-        spihost=esp.HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=240, height=320, start_x=0, start_y=0,
+        spihost=HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=240, height=320, start_x=0, start_y=0,
         colormode=COLOR_MODE_BGR, rot=PORTRAIT, invert=False, double_buffer=True, half_duplex=True,
         asynchronous=False, initialize=True, color_format=lv.COLOR_FORMAT.NATIVE_REVERSE
     ):
@@ -625,7 +625,7 @@ class ili9488(ili9XXX):
 
     def __init__(self,
         miso=5, mosi=18, clk=19, cs=13, dc=12, rst=4, power=14, backlight=15, backlight_on=0, power_on=0,
-        spihost=esp.HSPI_HOST, spimode=0, mhz=40, factor=8, hybrid=True, width=320, height=480, colormode=COLOR_MODE_RGB,
+        spihost=HSPI_HOST, spimode=0, mhz=40, factor=8, hybrid=True, width=320, height=480, colormode=COLOR_MODE_RGB,
         rot=PORTRAIT, invert=False, double_buffer=True, half_duplex=True, asynchronous=False, initialize=True,
         color_format=None
     ):
@@ -675,7 +675,7 @@ class gc9a01(ili9XXX):
 
     def __init__(self,
         miso=5, mosi=18, clk=19, cs=13, dc=12, rst=4, power=14, backlight=15, backlight_on=0, power_on=0,
-        spihost=esp.HSPI_HOST, spimode=0, mhz=60, factor=4, hybrid=True, width=240, height=240, colormode=COLOR_MODE_RGB,
+        spihost=HSPI_HOST, spimode=0, mhz=60, factor=4, hybrid=True, width=240, height=240, colormode=COLOR_MODE_RGB,
         rot=PORTRAIT, invert=False, double_buffer=True, half_duplex=True, asynchronous=False, initialize=True,
         color_format=None
     ):
@@ -762,7 +762,7 @@ class st7789(ili9XXX):
 
     def __init__(self,
         miso=-1, mosi=19, clk=18, cs=5, dc=16, rst=23, power=-1, backlight=4, backlight_on=1, power_on=0,
-        spihost=esp.HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=320, height=240, start_x=0, start_y=0,
+        spihost=HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=320, height=240, start_x=0, start_y=0,
         colormode=COLOR_MODE_BGR, rot=PORTRAIT, invert=True, double_buffer=True, half_duplex=True,
         asynchronous=False, initialize=True, color_format=lv.COLOR_FORMAT.NATIVE_REVERSE):
 
@@ -814,7 +814,7 @@ class st7735(ili9XXX):
 
     def __init__(self,
         miso=-1, mosi=19, clk=18, cs=13, dc=12, rst=4, power=-1, backlight=15, backlight_on=1, power_on=0,
-        spihost=esp.HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=128, height=160, start_x=0, start_y=0,
+        spihost=HSPI_HOST, spimode=0, mhz=40, factor=4, hybrid=True, width=128, height=160, start_x=0, start_y=0,
         colormode=COLOR_MODE_RGB, rot=PORTRAIT, invert=False, double_buffer=True, half_duplex=True,
         asynchronous=False, initialize=True, color_format=lv.COLOR_FORMAT.NATIVE_REVERSE):
 
