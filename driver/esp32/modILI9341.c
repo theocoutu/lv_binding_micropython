@@ -10,6 +10,7 @@
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
 #include "lvgl/src/lv_hal/lv_hal_disp.h"
+#include "espidf.h"
 
 //////////////////////////////////////////////////////////////////////////////
 // ILI9341 requires specific lv_conf resolution and color depth
@@ -97,7 +98,7 @@ STATIC mp_obj_t ILI9341_make_new(const mp_obj_type_t *type,
 
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_mhz,MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=40}},
-        { MP_QSTR_spihost,MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=HSPI_HOST}},
+        { MP_QSTR_spihost,MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=ENUM_HSPI_HOST}},
         { MP_QSTR_miso,MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},             
         { MP_QSTR_mosi,MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},
         { MP_QSTR_clk,MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},

@@ -5,6 +5,32 @@
 #if __has_include("esp_idf_version.h")
 #   include "esp_idf_version.h"
 #endif
+/*
+#include "rom/lldesc.h"
+
+#include "esp_eth.h"
+
+
+lldesc_build_chain
+
+rtc_gpio_force_hold_all
+
+gpio_force_hold_all
+gpio_input_get_high
+gpio_output_set_high
+
+xt_clock_freq
+
+esp_eth_phy_new_lan87xx
+esp_eth_phy_new_lan8720
+esp_eth_phy_new_ksz8081
+esp_eth_phy_new_ksz8041
+esp_eth_phy_new_dp83848
+esp_eth_phy_new_lan87xx
+esp_eth_phy_new_rtl8201
+esp_eth_phy_new_ip101
+
+*/
 
 // Disable some macros and includes that make pycparser choke
 
@@ -43,6 +69,7 @@ typedef unsigned int	UBaseType_t;
 typedef void* system_event_t;
 typedef void *intr_handle_t;
 
+
 // Exclude SOC just because it contains large structs that don't interest the user
 #define _SOC_SPI_PERIPH_H_
 typedef void *spi_dev_t;
@@ -80,13 +107,11 @@ void * memset ( void * ptr, int value, size_t num );
 
 #include "soc/i2s_reg.h" // for SPH0645_WORKAROUND
 
-// macro mapping for the ESP32-S3, ESP32-C3 and ESP32-H2. These macros
-// have different names for those MCUs
+
 #if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32H2
     #define I2S_TIMING_REG I2S_TX_TIMING_REG
     #define I2S_CONF_REG I2S_TX_CONF_REG
 #endif
-
 
 static inline void SPH0645_WORKAROUND(int i2s_num)
 {
@@ -144,13 +169,6 @@ static inline void get_ccount(int *ccount)
 #include "sh2lib.h"
 
 
-#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32H2
-    #define SPI_HOST    SPI1_HOST
-    #define HSPI_HOST   SPI2_HOST
-    #define VSPI_HOST   SPI3_HOST
-
-#endif
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Helper function to register HTTP event handler
@@ -197,14 +215,24 @@ void ex_spi_post_cb_isr(spi_transaction_t *trans);
 
 #define EXPORT_CONST_INT(int_value) enum {ENUM_##int_value = int_value}
 
-#if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 4
+
+
+//#if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 4
+
 // SPI HOST enum was changed to macros on v4
+
 enum {
-    ENUM_SPI_HOST = SPI_HOST,
-    ENUM_HSPI_HOST = HSPI_HOST,
-    ENUM_VSPI_HOST = VSPI_HOST,
-};
+    ENUM_SPI_HOST = SPI1_HOST,
+#ifdef CONFIG_IDF_TARGET_ESP32
+    ENUM_HSPI_HOST = SPI2_HOST,
+    ENUM_VSPI_HOST = SPI3_HOST
+#else
+    ENUM_VSPI_HOST = SPI2_HOST,
+    ENUM_HSPI_HOST = SPI3_HOST
 #endif
+};
+//#endif
+
 
 enum {
     ENUM_portMAX_DELAY = portMAX_DELAY
