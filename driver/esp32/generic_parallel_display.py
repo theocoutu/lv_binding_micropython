@@ -1,6 +1,8 @@
 
 import espidf
 import lvgl as lv
+import machine
+import micropython
 
 
 class GenericParallelDisplay(object):
@@ -11,7 +13,8 @@ class GenericParallelDisplay(object):
         hsync_back_porch, hsync_front_porch, hsync_polarity, vsync_pulse_width, 
         vsync_back_porch, vsync_front_porch, vsync_polarity, pclk_active_neg,
         d0, d1, d2, d3, d4, d5, d6, d7, d8=None, d9=None, d10=None, d11=None, 
-        d12=None, d13=None, d14=None, d15=None, init=True
+        d12=None, d13=None, d14=None, d15=None, init=True, backlight=None,
+        backlight_pwm=False
     ):
         self.de = de
         self.vsync = vsync
@@ -71,10 +74,39 @@ class GenericParallelDisplay(object):
         self.disp_drv.ver_res = height
         self.disp_drv.flush_cb = self.flush_cb
         self.disp_drv.draw_buf = self.disp_draw_buf
-        
+
+        if backlight is None:
+            self.backlight = None
+            self.backlight_pwm = None
+        else:
+            self.backlight = machine.Pin(backlight, machine.Pin.OUT)
+            if backlight_pwm:
+                self.backlight_pwm = machine.PWM(self.backlight)
+            else:
+                self.backlight_pwm = None
+
         if init:
             self.init()
-        
+
+    @property
+    def backlight_brightness(self):
+        if self.backlight_pwm is None:
+            return self.backlight.value()
+        else:
+            duty = self.backlight_pwm.duty_u16()
+            return int(duty / 65535 * 100.0)
+
+    @backlight_brightness.setter
+    def backlight_brightness(self, value):
+        if self.backlight_pwm is None:
+            if value >= 50:
+                value = 1
+            else:
+                value = 0
+            self.backlight.value(value)
+        else:
+            self.backlight_pwm.duty_u16(int(value / 100.0 * 65535))
+
     def init(self):
         panel_config = self.panel_config
         
@@ -139,11 +171,11 @@ class GenericParallelDisplay(object):
         if ret != espidf.ESP.OK:
             raise RuntimeError("Failed creating display panel")
     
-        ret = esp_lcd_panel_reset(self.panel_handle)
+        ret = espidf.esp_lcd_panel_reset(self.panel_handle)
         if ret != espidf.ESP.OK:
             raise RuntimeError("Failed resetting display panel")
     
-        ret = esp_lcd_panel_init(self.panel_handle)
+        ret = espidf.esp_lcd_panel_init(self.panel_handle)
         if ret != espidf.ESP.OK:
             raise RuntimeError("Failed initializing display panel")
     
@@ -160,10 +192,18 @@ class GenericParallelDisplay(object):
             self.rgb_panel.fb, None, self.width * self.height
         )
         self.disp_drv.register()
-    
+
     def flush_cb(self, disp_drv, area, color_p):
+        x1 = area.x1
+        y1 = area.y1
+        x2 = area.x2
+        y2 = area.y2
+
+        size = (x2 - x1 + 1) * (y2 - y1 + 1)
+        data_view = color_p.__dereference__(size * lv.color_t.__SIZE__)
+
         espidf.esp_lcd_panel_draw_bitmap(
-            self.panel_handle, area.x1, area.y1, 
-            area.x2 + 1, area.y2 + 1, color_p
+            self.panel_handle, area.x1, area.y1,
+            x2 + 1, y2 + 1, data_view
         )
         lv.disp_flush_ready(disp_drv)
