@@ -2,7 +2,6 @@
 import espidf
 import lvgl as lv
 import machine
-import micropython
 
 
 class GenericParallelDisplay(object):
@@ -91,7 +90,7 @@ class GenericParallelDisplay(object):
     @property
     def backlight_brightness(self):
         if self.backlight_pwm is None:
-            return self.backlight.value()
+            return self.backlight.value() * 100
         else:
             duty = self.backlight_pwm.duty_u16()
             return int(duty / 65535 * 100.0)
