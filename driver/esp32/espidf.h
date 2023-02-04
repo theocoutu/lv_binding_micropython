@@ -80,6 +80,12 @@ void * memset ( void * ptr, int value, size_t num );
 
 #include "soc/i2s_reg.h" // for SPH0645_WORKAROUND
 
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32H2
+    #define I2S_TIMING_REG I2S_TX_TIMING_REG
+    #define I2S_CONF_REG I2S_TX_CONF_REG
+#endif
+
+
 static inline void SPH0645_WORKAROUND(int i2s_num)
 {
     REG_SET_BIT( I2S_TIMING_REG(i2s_num), BIT(9));
@@ -118,6 +124,12 @@ static inline void get_ccount(int *ccount)
 #   include "esp_clk.h"
 #endif
 
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32H2
+    #ifdef SOC_GPIO_SUPPORT_FORCE_HOLD
+        #undef SOC_GPIO_SUPPORT_FORCE_HOLD
+    #endif
+#endif
+
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
 #include "esp_heap_caps.h"
@@ -128,6 +140,299 @@ static inline void get_ccount(int *ccount)
 #include "mdns.h"
 #include "esp_http_client.h"
 #include "sh2lib.h"
+
+
+// This will allow for writing keyboard drivers and/or mouse drivers in Python
+#if CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32C6
+#include "usb/usb_helpers.h"
+#include "usb/usb_host.h"
+#include "usb/usb_types_ch9.h"
+#include "usb/usb_types_stack.h"
+
+
+
+//ENUM_USB_HOST_LIB_EVENT_FLAGS
+enum {
+    ENUM_USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS = USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS,
+    ENUM_USB_HOST_LIB_EVENT_FLAGS_ALL_FREE = USB_HOST_LIB_EVENT_FLAGS_ALL_FREE
+};
+
+//USB_EP_DESC_SIZE
+enum {
+    ENUM_USB_EP_DESC_SIZE = USB_EP_DESC_SIZE,
+};
+
+//USB_INTF_DESC_SIZE
+enum {
+    ENUM_USB_INTF_DESC_SIZE = USB_INTF_DESC_SIZE,
+};
+
+//USB_IAD_DESC_SIZE
+enum {
+    ENUM_USB_IAD_DESC_SIZE = USB_IAD_DESC_SIZE,
+};
+
+//USB_STR_DESC_SIZE
+enum {
+    ENUM_USB_STR_DESC_SIZE = USB_STR_DESC_SIZE,
+};
+
+//ENUM_USB_CLASS
+enum {
+    ENUM_USB_CLASS_PER_INTERFACE = USB_CLASS_PER_INTERFACE,
+    ENUM_USB_CLASS_AUDIO = USB_CLASS_AUDIO,
+    ENUM_USB_CLASS_COMM = USB_CLASS_COMM,
+    ENUM_USB_CLASS_HID = USB_CLASS_HID,
+    ENUM_USB_CLASS_PHYSICAL = USB_CLASS_PHYSICAL,
+    ENUM_USB_CLASS_STILL_IMAGE = USB_CLASS_STILL_IMAGE,
+    ENUM_USB_CLASS_PRINTER = USB_CLASS_PRINTER,
+    ENUM_USB_CLASS_MASS_STORAGE = USB_CLASS_MASS_STORAGE,
+    ENUM_USB_CLASS_HUB = USB_CLASS_HUB,
+    ENUM_USB_CLASS_CDC_DATA = USB_CLASS_CDC_DATA,
+    ENUM_USB_CLASS_CSCID = USB_CLASS_CSCID,
+    ENUM_USB_CLASS_CONTENT_SEC = USB_CLASS_CONTENT_SEC,
+    ENUM_USB_CLASS_VIDEO = USB_CLASS_VIDEO,
+    ENUM_USB_CLASS_WIRELESS_CONTROLLER = USB_CLASS_WIRELESS_CONTROLLER,
+    ENUM_USB_CLASS_PERSONAL_HEALTHCARE = USB_CLASS_PERSONAL_HEALTHCARE,
+    ENUM_USB_CLASS_AUDIO_VIDEO = USB_CLASS_AUDIO_VIDEO,
+    ENUM_USB_CLASS_BILLBOARD = USB_CLASS_BILLBOARD,
+    ENUM_USB_CLASS_USB_TYPE_C_BRIDGE = USB_CLASS_USB_TYPE_C_BRIDGE,
+    ENUM_USB_CLASS_MISC = USB_CLASS_MISC,
+    ENUM_USB_CLASS_APP_SPEC = USB_CLASS_APP_SPEC,
+    ENUM_USB_CLASS_VENDOR_SPEC = USB_CLASS_VENDOR_SPEC
+};
+
+//USB_SUBCLASS_VENDOR_SPEC
+enum {
+    ENUM_USB_SUBCLASS_VENDOR_SPEC = USB_SUBCLASS_VENDOR_SPEC
+};
+
+//USB_CONFIG_DESC_SIZE
+enum {
+    ENUM_USB_CONFIG_DESC_SIZE = USB_CONFIG_DESC_SIZE
+};
+
+//USB_B_ENDPOINT_ADDRESS_EP
+enum {
+    ENUM_USB_B_ENDPOINT_ADDRESS_EP_NUM_MASK = USB_B_ENDPOINT_ADDRESS_EP_NUM_MASK,
+    ENUM_USB_B_ENDPOINT_ADDRESS_EP_DIR_MASK = USB_B_ENDPOINT_ADDRESS_EP_DIR_MASK
+};
+
+//USB_B_DESCRIPTOR_TYPE
+enum {
+    ENUM_USB_B_DESCRIPTOR_TYPE_DEVICE = USB_B_DESCRIPTOR_TYPE_DEVICE,
+    ENUM_USB_B_DESCRIPTOR_TYPE_CONFIGURATION = USB_B_DESCRIPTOR_TYPE_CONFIGURATION,
+    ENUM_USB_B_DESCRIPTOR_TYPE_STRING = USB_B_DESCRIPTOR_TYPE_STRING,
+    ENUM_USB_B_DESCRIPTOR_TYPE_INTERFACE = USB_B_DESCRIPTOR_TYPE_INTERFACE,
+    ENUM_USB_B_DESCRIPTOR_TYPE_ENDPOINT = USB_B_DESCRIPTOR_TYPE_ENDPOINT,
+    ENUM_USB_B_DESCRIPTOR_TYPE_DEVICE_QUALIFIER = USB_B_DESCRIPTOR_TYPE_DEVICE_QUALIFIER,
+    ENUM_USB_B_DESCRIPTOR_TYPE_OTHER_SPEED_CONFIGURATION = USB_B_DESCRIPTOR_TYPE_OTHER_SPEED_CONFIGURATION,
+    ENUM_USB_B_DESCRIPTOR_TYPE_INTERFACE_POWER = USB_B_DESCRIPTOR_TYPE_INTERFACE_POWER,
+    ENUM_USB_B_DESCRIPTOR_TYPE_OTG = USB_B_DESCRIPTOR_TYPE_OTG,
+    ENUM_USB_B_DESCRIPTOR_TYPE_DEBUG = USB_B_DESCRIPTOR_TYPE_DEBUG,
+    ENUM_USB_B_DESCRIPTOR_TYPE_INTERFACE_ASSOCIATION = USB_B_DESCRIPTOR_TYPE_INTERFACE_ASSOCIATION,
+    ENUM_USB_B_DESCRIPTOR_TYPE_SECURITY = USB_B_DESCRIPTOR_TYPE_SECURITY,
+    ENUM_USB_B_DESCRIPTOR_TYPE_KEY = USB_B_DESCRIPTOR_TYPE_KEY,
+    ENUM_USB_B_DESCRIPTOR_TYPE_ENCRYPTION_TYPE = USB_B_DESCRIPTOR_TYPE_ENCRYPTION_TYPE,
+    ENUM_USB_B_DESCRIPTOR_TYPE_BOS = USB_B_DESCRIPTOR_TYPE_BOS,
+    ENUM_USB_B_DESCRIPTOR_TYPE_DEVICE_CAPABILITY = USB_B_DESCRIPTOR_TYPE_DEVICE_CAPABILITY,
+    ENUM_USB_B_DESCRIPTOR_TYPE_WIRELESS_ENDPOINT_COMP = USB_B_DESCRIPTOR_TYPE_WIRELESS_ENDPOINT_COMP,
+    ENUM_USB_B_DESCRIPTOR_TYPE_WIRE_ADAPTER = USB_B_DESCRIPTOR_TYPE_WIRE_ADAPTER,
+    ENUM_USB_B_DESCRIPTOR_TYPE_RPIPE = USB_B_DESCRIPTOR_TYPE_RPIPE,
+    ENUM_USB_B_DESCRIPTOR_TYPE_CS_RADIO_CONTROL = USB_B_DESCRIPTOR_TYPE_CS_RADIO_CONTROL,
+    ENUM_USB_B_DESCRIPTOR_TYPE_PIPE_USAGE = USB_B_DESCRIPTOR_TYPE_PIPE_USAGE,
+};
+
+//USB_B_REQUEST
+enum {
+    ENUM_USB_B_REQUEST_GET_STATUS = USB_B_REQUEST_GET_STATUS,
+    ENUM_USB_B_REQUEST_CLEAR_FEATURE = USB_B_REQUEST_CLEAR_FEATURE,
+    ENUM_USB_B_REQUEST_SET_FEATURE = USB_B_REQUEST_SET_FEATURE,
+    ENUM_USB_B_REQUEST_SET_ADDRESS = USB_B_REQUEST_SET_ADDRESS,
+    ENUM_USB_B_REQUEST_GET_DESCRIPTOR = USB_B_REQUEST_GET_DESCRIPTOR,
+    ENUM_USB_B_REQUEST_SET_DESCRIPTOR = USB_B_REQUEST_SET_DESCRIPTOR,
+    ENUM_USB_B_REQUEST_GET_CONFIGURATION = USB_B_REQUEST_GET_CONFIGURATION,
+    ENUM_USB_B_REQUEST_SET_CONFIGURATION = USB_B_REQUEST_SET_CONFIGURATION,
+    ENUM_USB_B_REQUEST_GET_INTERFACE = USB_B_REQUEST_GET_INTERFACE,
+    ENUM_USB_B_REQUEST_SET_INTERFACE = USB_B_REQUEST_SET_INTERFACE,
+    ENUM_USB_B_REQUEST_SYNCH_FRAME = USB_B_REQUEST_SYNCH_FRAME
+};
+
+//USB_SETUP_PACKET_SIZE
+enum {
+    ENUM_USB_SETUP_PACKET_SIZE = USB_SETUP_PACKET_SIZE
+};
+
+//USB_BM_ATTRIBUTES
+enum {
+    ENUM_USB_BM_ATTRIBUTES_ONE = USB_BM_ATTRIBUTES_ONE,
+    ENUM_USB_BM_ATTRIBUTES_SELFPOWER = USB_BM_ATTRIBUTES_SELFPOWER,
+    ENUM_USB_BM_ATTRIBUTES_WAKEUP = USB_BM_ATTRIBUTES_WAKEUP,
+    ENUM_USB_BM_ATTRIBUTES_BATTERY = USB_BM_ATTRIBUTES_BATTERY
+};
+
+//USB_BM_ATTRIBUTES_XFER
+enum {
+    ENUM_USB_BM_ATTRIBUTES_XFER_TYPE_MASK = USB_BM_ATTRIBUTES_XFERTYPE_MASK,
+    ENUM_USB_BM_ATTRIBUTES_XFER_CONTROL = USB_BM_ATTRIBUTES_XFER_CONTROL,
+    ENUM_USB_BM_ATTRIBUTES_XFER_ISOC = USB_BM_ATTRIBUTES_XFER_ISOC,
+    ENUM_USB_BM_ATTRIBUTES_XFER_BULK = USB_BM_ATTRIBUTES_XFER_BULK,
+    ENUM_USB_BM_ATTRIBUTES_XFER_INT = USB_BM_ATTRIBUTES_XFER_INT
+};
+
+//USB_BM_ATTRIBUTES_SYNC
+enum {
+    ENUM_USB_BM_ATTRIBUTES_SYNC_TYPE_MASK = USB_BM_ATTRIBUTES_SYNCTYPE_MASK,
+    ENUM_USB_BM_ATTRIBUTES_SYNC_NONE = USB_BM_ATTRIBUTES_SYNC_NONE ,
+    ENUM_USB_BM_ATTRIBUTES_SYNC_ASYNC = USB_BM_ATTRIBUTES_SYNC_ASYNC,
+    ENUM_USB_BM_ATTRIBUTES_SYNC_ADAPTIVE = USB_BM_ATTRIBUTES_SYNC_ADAPTIVE,
+    ENUM_USB_BM_ATTRIBUTES_SYNC_SYNC = USB_BM_ATTRIBUTES_SYNC_SYNC
+};
+
+//USB_BM_ATTRIBUTES_USAGE
+enum {
+    ENUM_USB_BM_ATTRIBUTES_USAGE_TYPE_MASK = USB_BM_ATTRIBUTES_USAGETYPE_MASK,
+    ENUM_USB_BM_ATTRIBUTES_USAGE_DATA = USB_BM_ATTRIBUTES_USAGE_DATA,
+    ENUM_USB_BM_ATTRIBUTES_USAGE_FEEDBACK = USB_BM_ATTRIBUTES_USAGE_FEEDBACK,
+    ENUM_USB_BM_ATTRIBUTES_USAGE_IMPLICIT_FB = USB_BM_ATTRIBUTES_USAGE_IMPLICIT_FB
+};
+
+//USB_BM_REQUEST_TYPE
+enum {
+    ENUM_USB_BM_REQUEST_TYPE_DIR_OUT = USB_BM_REQUEST_TYPE_DIR_OUT,
+    ENUM_USB_BM_REQUEST_TYPE_DIR_IN = USB_BM_REQUEST_TYPE_DIR_IN,
+    ENUM_USB_BM_REQUEST_TYPE_TYPE_STANDARD = USB_BM_REQUEST_TYPE_TYPE_STANDARD,
+    ENUM_USB_BM_REQUEST_TYPE_TYPE_CLASS = USB_BM_REQUEST_TYPE_TYPE_CLASS,
+    ENUM_USB_BM_REQUEST_TYPE_TYPE_VENDOR = USB_BM_REQUEST_TYPE_TYPE_VENDOR,
+    ENUM_USB_BM_REQUEST_TYPE_TYPE_RESERVED = USB_BM_REQUEST_TYPE_TYPE_RESERVED,
+    ENUM_USB_BM_REQUEST_TYPE_TYPE_MASK = USB_BM_REQUEST_TYPE_TYPE_MASK,
+    ENUM_USB_BM_REQUEST_TYPE_RECIP_DEVICE = USB_BM_REQUEST_TYPE_RECIP_DEVICE,
+    ENUM_USB_BM_REQUEST_TYPE_RECIP_INTERFACE = USB_BM_REQUEST_TYPE_RECIP_INTERFACE,
+    ENUM_USB_BM_REQUEST_TYPE_RECIP_ENDPOINT = USB_BM_REQUEST_TYPE_RECIP_ENDPOINT,
+    ENUM_USB_BM_REQUEST_TYPE_RECIP_OTHER = USB_BM_REQUEST_TYPE_RECIP_OTHER,
+    ENUM_USB_BM_REQUEST_TYPE_RECIP_MASK = USB_BM_REQUEST_TYPE_RECIP_MASK
+};
+
+//USB_W_VALUE_DT
+enum {
+    ENUM_USB_W_VALUE_DT_DEVICE = USB_W_VALUE_DT_DEVICE,
+    ENUM_USB_W_VALUE_DT_CONFIG = USB_W_VALUE_DT_CONFIG,
+    ENUM_USB_W_VALUE_DT_STRING = USB_W_VALUE_DT_STRING,
+    ENUM_USB_W_VALUE_DT_INTERFACE = USB_W_VALUE_DT_INTERFACE,
+    ENUM_USB_W_VALUE_DT_ENDPOINT = USB_W_VALUE_DT_ENDPOINT,
+    ENUM_USB_W_VALUE_DT_DEVICE_QUALIFIER = USB_W_VALUE_DT_DEVICE_QUALIFIER,
+    ENUM_USB_W_VALUE_DT_OTHER_SPEED_CONFIG = USB_W_VALUE_DT_OTHER_SPEED_CONFIG,
+    ENUM_USB_W_VALUE_DT_INTERFACE_POWER = USB_W_VALUE_DT_INTERFACE_POWER
+};
+
+//USB_STANDARD_DESC_SIZE
+enum {
+    ENUM_USB_STANDARD_DESC_SIZE = USB_STANDARD_DESC_SIZE
+};
+
+//USB_DEVICE_DESC_SIZE
+enum {
+    ENUM_USB_DEVICE_DESC_SIZE = USB_DEVICE_DESC_SIZE
+};
+
+//USB_TRANSFER_FLAG_ZERO_PACK
+enum {
+    ENUM_USB_TRANSFER_FLAG_ZERO_PACK = USB_TRANSFER_FLAG_ZERO_PACK,
+};
+
+enum {
+#if CONFIG_IDF_TARGET_ESP32C3
+    ENUM_USB_DATA_PIN_MINUS = 18,
+    ENUM_USB_DATA_PIN_PLUS = 19
+#elif CONFIG_IDF_TARGET_ESP32C6
+    ENUM_USB_DATA_PIN_MINUS = 12,
+    ENUM_USB_DATA_PIN_PLUS = 13
+#else // CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3
+    ENUM_USB_DATA_PIN_MINUS = 19,
+    ENUM_USB_DATA_PIN_PLUS = 20
+#endif
+};
+
+
+typedef struct {
+    uint8_t *const data_buffer;                     //< Pointer to data buffer
+    const size_t data_buffer_size;                  //< Size of the data buffer in bytes
+    int num_bytes;                                  //< Number of bytes to transfer.
+                                                    //     Control transfers should include the size of the setup packet.
+                                                    //     Isochronous transfer should be the total transfer size of all packets.
+                                                    //     For non-control IN transfers, num_bytes should be an integer multiple of MPS.
+    int actual_num_bytes;                           //< Actual number of bytes transferred
+    uint32_t flags;                                 //< Transfer flags
+    usb_device_handle_t device_handle;              //< Device handle
+    uint8_t bEndpointAddress;                       //< Endpoint Address
+    usb_transfer_status_t status;                   //< Status of the transfer
+    uint32_t timeout_ms;                            //< Timeout (in milliseconds) of the packet (currently not supported yet)
+    usb_transfer_cb_t callback;                     //< Transfer callback
+    void *context;                                  //< Context variable for transfer to associate transfer with something
+    const int num_isoc_packets;                     //< Only relevant to Isochronous. Number of service periods (i.e., intervals) to transfer data buffer over.
+    usb_isoc_packet_desc_t isoc_packet_desc[];      //< Descriptors for each Isochronous packet
+} usb_transfer_s;
+
+
+/*
+This is a dummy function in order to get gen_mpy to populate different
+structures and enumerations. The only way it works is they have to be added to
+a function.
+*/
+static inline void usb_dummy_func(usb_iad_desc_t *param1, usb_transfer_s *param5){}
+
+
+#endif
+
+//this exposes the esp_lcd functions, structures and enumerations to Micropython
+
+#if defined(SOC_LCD_RGB_SUPPORTED) && SOC_LCD_RGB_SUPPORTED
+#include "esp_lcd_panel_commands.h"
+#include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_rgb.h"
+#include "esp_lcd_panel_vendor.h"
+#include "esp_lcd_panel_ops.h"
+#include "esp_lcd_panel_interface.h"
+#include "esp_private/gdma.h"
+#include "esp_pm.h"
+#include "hal/dma_types.h"
+#include "hal/lcd_hal.h"
+#include "hal/lcd_types.h"
+
+typedef struct {
+    esp_lcd_panel_t base;  // Base class of generic lcd panel
+    int panel_id;          // LCD panel ID
+    lcd_hal_context_t hal; // Hal layer object
+    size_t data_width;     // Number of data lines (e.g. for RGB565, the data width is 16)
+    size_t sram_trans_align;  // Alignment for framebuffer that allocated in SRAM
+    size_t psram_trans_align; // Alignment for framebuffer that allocated in PSRAM
+    int disp_gpio_num;     // Display control GPIO, which is used to perform action like "disp_off"
+    intr_handle_t intr;    // LCD peripheral interrupt handle
+    esp_pm_lock_handle_t pm_lock; // Power management lock
+    size_t num_dma_nodes;  // Number of DMA descriptors that used to carry the frame buffer
+    uint8_t *fb;           // Frame buffer
+    size_t fb_size;        // Size of frame buffer
+    int data_gpio_nums[SOC_LCD_RGB_DATA_WIDTH]; // GPIOs used for data lines, we keep these GPIOs for action like "invert_color"
+    uint32_t src_clk_hz;   // Peripheral source clock resolution
+    esp_lcd_rgb_timing_t timings;   // RGB timing parameters (e.g. pclk, sync pulse, porch width)
+    gdma_channel_handle_t dma_chan; // DMA channel handle
+    esp_lcd_rgb_panel_frame_trans_done_cb_t on_frame_trans_done; // Callback, invoked after frame trans done
+    void *user_ctx;                // Reserved user's data of callback functions
+    int x_gap;                      // Extra gap in x coordinate, it's used when calculate the flush window
+    int y_gap;                      // Extra gap in y coordinate, it's used when calculate the flush window
+    int lcd_clk_flags;              // LCD clock calculation flags
+    struct {
+        unsigned int disp_en_level: 1; // The level which can turn on the screen by `disp_gpio_num`
+        unsigned int stream_mode: 1;   // If set, the LCD transfers data continuously, otherwise, it stops refreshing the LCD when transaction done
+        unsigned int fb_in_psram: 1;   // Whether the frame buffer is in PSRAM
+    } flags;
+    dma_descriptor_t dma_nodes[]; // DMA descriptor pool of size `num_dma_nodes`
+} esp_rgb_panel_t;
+
+
+esp_rgb_panel_t *esp_rgb_panel_container(esp_lcd_panel_handle_t panel_handle);
+
+#endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Helper function to register HTTP event handler
@@ -174,14 +479,40 @@ void ex_spi_post_cb_isr(spi_transaction_t *trans);
 
 #define EXPORT_CONST_INT(int_value) enum {ENUM_##int_value = int_value}
 
-#if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 4
+//#if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 4
+
 // SPI HOST enum was changed to macros on v4
+// ESP
+
 enum {
-    ENUM_SPI_HOST = SPI_HOST,
-    ENUM_HSPI_HOST = HSPI_HOST,
-    ENUM_VSPI_HOST = VSPI_HOST,
+  ENUM_ESP_OK = 0,
+  ENUM_ESP_BAD_DATA_LEN = 0xC0,
+  ENUM_ESP_BAD_DATA_CHECKSUM,
+  ENUM_ESP_BAD_BLOCKSIZE,
+  ENUM_ESP_INVALID_COMMAND,
+  ENUM_ESP_FAILED_SPI_OP,
+  ENUM_ESP_FAILED_SPI_UNLOCK,
+  ENUM_ESP_NOT_IN_FLASH_MODE,
+  ENUM_ESP_INFLATE_ERROR,
+  ENUM_ESP_NOT_ENOUGH_DATA,
+  ENUM_ESP_TOO_MUCH_DATA,
+  ENUM_ESP_CMD_NOT_IMPLEMENTED = 0xFF
 };
+
+
+enum {
+    ENUM_SPI_HOST = SPI1_HOST,
+#ifdef CONFIG_IDF_TARGET_ESP32
+    ENUM_HSPI_HOST = SPI2_HOST,
+    ENUM_VSPI_HOST = SPI3_HOST
+#else
+    ENUM_VSPI_HOST = SPI2_HOST,
+    ENUM_HSPI_HOST = SPI3_HOST
 #endif
+};
+//#endif
+
+
 
 enum {
     ENUM_portMAX_DELAY = portMAX_DELAY
@@ -240,5 +571,3 @@ enum {
 void ili9xxx_post_cb_isr(spi_transaction_t *trans);
 
 void ili9xxx_flush(void *disp_drv, const void *area, void *color_p);
-
-

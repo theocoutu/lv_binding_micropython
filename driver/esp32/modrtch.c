@@ -19,13 +19,12 @@
 #include "esp_log.h"
 #include "soc/adc_channel.h"
 
-#if __has_include("driver/adc_deprecated.h")
-#include "driver/adc_deprecated.h"
-#endif
-
+// instead of reinventing the wheel to handle the adc channels we use the
+// system already coded into micropython
+#include "machine_adc.c"
 
 //////////////////////////////////////////////////////////////////////////////
-// Constants 
+// Constants
 //////////////////////////////////////////////////////////////////////////////
 
 static const char TAG[] = "[RTCH]";
@@ -55,18 +54,6 @@ static const char TAG[] = "[RTCH]";
 #define _CONCAT3(a,b,c) a ## b ## c
 #define CONCAT3(a,b,c) _CONCAT3(a,b,c)
 #endif
-
-#define GPIO_TO_ADC_ELEMENT(x) [x] = CONCAT3(ADC1_GPIO, x, _CHANNEL)
-static const int gpio_to_adc[] = {
-        GPIO_TO_ADC_ELEMENT(36),
-        GPIO_TO_ADC_ELEMENT(37),
-        GPIO_TO_ADC_ELEMENT(38),
-        GPIO_TO_ADC_ELEMENT(39),
-        GPIO_TO_ADC_ELEMENT(32),
-        GPIO_TO_ADC_ELEMENT(33),
-        GPIO_TO_ADC_ELEMENT(34),
-        GPIO_TO_ADC_ELEMENT(35),
-};
 
 //////////////////////////////////////////////////////////////////////////////
 // Module definition
@@ -161,7 +148,7 @@ STATIC const mp_rom_map_elem_t rtch_globals_table[] = {
         { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_rtch) },
         { MP_ROM_QSTR(MP_QSTR_touch), (mp_obj_t)&rtch_type},
 };
-         
+
 
 STATIC MP_DEFINE_CONST_DICT (
     mp_module_rtch_globals,
@@ -199,12 +186,12 @@ STATIC mp_obj_t rtch_make_new(const mp_obj_type_t *type,
      };
 
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_xp, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},  
-        { MP_QSTR_yp, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},  
-        { MP_QSTR_xm, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},  
-        { MP_QSTR_ym, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},  
-        { MP_QSTR_touch_rail, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}}, 
-        { MP_QSTR_touch_sense, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}}, 
+        { MP_QSTR_xp, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},
+        { MP_QSTR_yp, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},
+        { MP_QSTR_xm, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},
+        { MP_QSTR_ym, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},
+        { MP_QSTR_touch_rail, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},
+        { MP_QSTR_touch_sense, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},
 
         { MP_QSTR_screen_width, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},
         { MP_QSTR_screen_height, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=-1}},
@@ -212,8 +199,8 @@ STATIC mp_obj_t rtch_make_new(const mp_obj_type_t *type,
         { MP_QSTR_cal_y0, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=200}},
         { MP_QSTR_cal_x1, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=3500}},
         { MP_QSTR_cal_y1, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=3470}},
-        { MP_QSTR_touch_samples, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=9}}, 
-        { MP_QSTR_touch_samples_threshold, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=500}}, 
+        { MP_QSTR_touch_samples, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=9}},
+        { MP_QSTR_touch_samples_threshold, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int=500}},
    };
 
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
@@ -344,7 +331,7 @@ STATIC mp_obj_t mp_rtch_deinit(mp_obj_t self_in)
             (1ULL<<self->xp) |
             (1ULL<<self->yp) |
             (1ULL<<self->xm) |
-            (1ULL<<self->ym) | 
+            (1ULL<<self->ym) |
             (1ULL<<self->touch_rail) |
             (1ULL<<self->touch_sense)
     });
@@ -390,11 +377,16 @@ STATIC int measure_axis(
 
     // Init ADC
 
-    adc1_channel_t adc_channel = gpio_to_adc[measure];
+    const madc_obj_t *adc_channel = madc_search_helper(NULL, -1, measure);
+    if (!adc_channel) {
+        mp_raise_ValueError(MP_ERROR_TEXT("invalid pin"));
+    }
+    madcblock_bits_helper(adc_channel->block, ADC_WIDTH_BIT_12);
+    madc_atten_helper(adc_channel, ADC_ATTEN_DB_11);
 
-    adc_gpio_init(ADC_UNIT_1, adc_channel);
-    adc1_config_width(ADC_WIDTH_BIT_12);
-    adc1_config_channel_atten(adc_channel,ADC_ATTEN_DB_11);
+    //adc_gpio_init(ADC_UNIT_1, adc_channel);
+    //adc1_config_width(ADC_WIDTH_BIT_12);
+    //adc1_config_channel_atten(adc_channel,ADC_ATTEN_DB_11);
 
     vTaskDelay(RTCH_INIT_ADC_WAIT_MS / portTICK_RATE_MS);
 
@@ -405,7 +397,9 @@ STATIC int measure_axis(
     for (int i=0; i<sample_count; i++)
     {
         //vTaskDelay(RTCH_SAMPLE_WAIT_MS / portTICK_RATE_MS);
-        samples[i] = adc1_get_raw(adc_channel);
+
+        samples[i] = (int) madcblock_read_helper(adc_channel->block, adc_channel->channel_id);
+        //samples[i] = adc1_get_raw(ADCBLOCK1, adc_channel);
     }
     qsort(samples, sample_count, sizeof(samples[0]), compare_int);
 
