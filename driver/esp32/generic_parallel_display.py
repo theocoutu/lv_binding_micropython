@@ -193,16 +193,13 @@ class GenericParallelDisplay(object):
         self.disp_drv.register()
 
     def flush_cb(self, disp_drv, area, color_p):
-        x1 = area.x1
-        y1 = area.y1
-        x2 = area.x2
-        y2 = area.y2
-
-        size = (x2 - x1 + 1) * (y2 - y1 + 1)
-        data_view = color_p.__dereference__(size * lv.color_t.__SIZE__)
-
         espidf.esp_lcd_panel_draw_bitmap(
-            self.panel_handle, area.x1, area.y1,
-            x2 + 1, y2 + 1, data_view
+            self.panel_handle,
+            area.x1,
+            area.y1,
+            area.x2 + 1,
+            area.y2 + 1,
+            color_p
         )
         lv.disp_flush_ready(disp_drv)
+

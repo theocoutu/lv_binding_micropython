@@ -1,7 +1,6 @@
 import lvgl as lv
-
 from micropython import const
-import espidf as esp  # NOQA
+import espidf as _espidf  # NOQA
 
 FT6236_I2C_SLAVE_ADDR = const(0x38)
 
@@ -173,8 +172,8 @@ class FT6x36:
         self.touch_inputs = ft6x36_touch_t(-1, -1, lv.INDEV_STATE.RELEASED)
         self.touch_count = 0
         self.touch_cycles = 0
-        self.start_time_ptr = esp.C_Pointer()
-        self.end_time_ptr = esp.C_Pointer()
+        self.start_time_ptr = _espidf.C_Pointer()
+        self.end_time_ptr = _espidf.C_Pointer()
         self.dev_addr = dev_addr
         self.swap_xy = swap_xy
         self.invert_x = invert_x
@@ -243,11 +242,9 @@ class FT6x36:
         return x, y
 
     def read(self, _, data):
-        esp.get_ccount(self.start_time_ptr)
-
+        _espidf.get_ccount(self.start_time_ptr)
         coords = self._get_coords()
-
-        esp.get_ccount(self.end_time_ptr)
+        _espidf.get_ccount(self.end_time_ptr)
 
         if self.end_time_ptr.int_val > self.start_time_ptr.int_val:
             self.touch_cycles += (
@@ -272,5 +269,4 @@ class FT6x36:
         data.point.x = self.touch_inputs.last_x
         data.point.y = self.touch_inputs.last_y
         data.state = self.touch_inputs.current_state
-
         return False
