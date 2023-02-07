@@ -120,10 +120,9 @@ class GT911(object):
         if not lv.is_initialized():
             lv.init()
 
-        # disp = lv.disp_t.__cast__(None)  # NOQA
-        # width and height were 0, hardcoded for now.
-        self.width = 800  # disp.get_hor_res()
-        self.height = 480  # disp.get_ver_res()
+        disp = lv.disp_t.__cast__(None)  # NOQA
+        self.width = disp.get_hor_res()
+        self.height = disp.get_ver_res()
 
         self.data_buf = bytearray(3)
 
@@ -220,7 +219,7 @@ class GT911(object):
         data.point.x = self.touch_inputs.last_x
         data.point.y = self.touch_inputs.last_y
         data.state = self.touch_inputs.current_state
-        print("data", data)  # Never called
+        # print("data", data.point.x, data.point.y, data.state)   # debug trace, ok
         return False
 
     def _get_coords(self):
@@ -250,7 +249,7 @@ class GT911(object):
                     coord_y.append(y)
 
                 x = int(sum(coord_x) / len(coord_x))
-                y = int(sum(coord_x) / len(coord_x))
+                y = int(sum(coord_y) / len(coord_y))
 
                 if self.swap_xy:
                     x, y = y, x
