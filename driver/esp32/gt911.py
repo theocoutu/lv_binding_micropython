@@ -1,3 +1,22 @@
+"""
+Pure python GT911 touch driver for micropython, lvgl on esp32s3.
+
+usage:
+from machine import Pin,I2C
+from gt911 import GT911
+
+[... init lvgl and lv_display here ...]
+
+i2c = I2C(0, sda=Pin(17), scl=Pin(18), freq=444444)
+touch = GT911(i2c)
+
+For I2C timeout on esp32s3, see this patch https://github.com/micropython/micropython/pull/9434/commits/8f479ab42e26e5b91db2ca079945d6e552798ab5
+from https://github.com/micropython/micropython/issues/7772
+in mpconfigboard.h, you'll need to define
+#define I2C_LL_MAX_TIMEOUT  0x0000001FU
+// (this constant is specific for every esp32 subvariant, there for s3)
+
+"""
 import lvgl as lv
 from micropython import const
 import espidf as _espidf  # NOQA
@@ -170,7 +189,7 @@ class GT911(object):
         print('Touch product id:', self.product_id)
         print('Touch firmware:', self.firmware)
 
-        self.i2c.write(GT911_I2C_SLAVE_ADDR, config, len(config))
+        self.i2c.writeto(GT911_I2C_SLAVE_ADDR, bytearray(config))  # , len(config))
         self.set_command_register(0x00)
 
     def read(self, _, data):  # lv_indev_drv_t lv_indev_data_t-> bool
@@ -200,6 +219,7 @@ class GT911(object):
         data.point.x = self.touch_inputs.last_x
         data.point.y = self.touch_inputs.last_y
         data.state = self.touch_inputs.current_state
+        # print("data", data.point.x, data.point.y, data.state)   # debug trace, ok
         return False
 
     def _get_coords(self):
@@ -215,10 +235,10 @@ class GT911(object):
                         ((GT911_POINT1_X_ADDR + (i * 8)) & 0xFF00) >> 8
                     )
                     self.data_buf[1] = (GT911_POINT1_X_ADDR + (i * 8)) & 0xFF
-                    self.i2c.write(GT911_I2C_SLAVE_ADDR, self.data_buf, 2)
+                    self.i2c.writeto(GT911_I2C_SLAVE_ADDR, self.data_buf[:2])  # , 2)
 
                     buf = bytearray(6)
-                    self.i2c.read(GT911_I2C_SLAVE_ADDR, buf)
+                    self.i2c.readfrom_into(GT911_I2C_SLAVE_ADDR, buf)
 
                     x = buf[0]
                     y = buf[2]
@@ -229,7 +249,7 @@ class GT911(object):
                     coord_y.append(y)
 
                 x = int(sum(coord_x) / len(coord_x))
-                y = int(sum(coord_x) / len(coord_x))
+                y = int(sum(coord_y) / len(coord_y))
 
                 if self.swap_xy:
                     x, y = y, x
@@ -254,28 +274,29 @@ class GT911(object):
             GT911_REG_COMMAND & 0xFF,
             command
         ])
-        self.i2c.write(GT911_I2C_SLAVE_ADDR, buf, 3)
+        self.i2c.writeto(GT911_I2C_SLAVE_ADDR, buf)  # , 3)
 
     @property
     def product_id(self):
         self.data_buf[0] = (GT911_REG_ID & 0xFF00) >> 8
         self.data_buf[1] = GT911_REG_ID & 0xFF
-        self.i2c.write(GT911_I2C_SLAVE_ADDR, self.data_buf, 2)
+        self.i2c.writeto(GT911_I2C_SLAVE_ADDR, self.data_buf[:2])  # , 2)
         buf = bytearray(4)
-        self.i2c.read(GT911_I2C_SLAVE_ADDR, buf)
+        self.i2c.readfrom_into(GT911_I2C_SLAVE_ADDR, buf)
 
         buf = bytearray([buf[3], buf[2], buf[1], buf[0]])
+        # Returns Touch product id: 119 on GT911
         return buf.decode('utf-8')
 
     @property
     def firmware(self):
         self.data_buf[0] = (GT911_REG_FW_VER & 0xFF00) >> 8
-        self.data_buf = GT911_REG_FW_VER & 0xFF
+        self.data_buf[1] = GT911_REG_FW_VER & 0xFF
 
-        self.i2c.write(GT911_I2C_SLAVE_ADDR, self.data_buf, 2)
+        self.i2c.writeto(GT911_I2C_SLAVE_ADDR, self.data_buf[:2])  # , 2)
         buf = bytearray(2)
-        self.i2c.read(GT911_I2C_SLAVE_ADDR, buf)
-
+        self.i2c.readfrom_into(GT911_I2C_SLAVE_ADDR, buf)
+        # Returns Touch firmware: 4192 on GT911 from MF
         return buf[1] << 8 | buf[0]
 
     @property
@@ -283,10 +304,11 @@ class GT911(object):
         self.data_buf[0] = (GT911_READ_COORD_ADDR & 0xFF00) >> 8
         self.data_buf[1] = GT911_READ_COORD_ADDR & 0xFF
 
-        self.i2c.write(GT911_I2C_SLAVE_ADDR, self.data_buf, 2)
+        self.i2c.writeto(GT911_I2C_SLAVE_ADDR, self.data_buf[:2])  # , 2)
         buf = bytearray(1)
 
-        self.i2c.read(GT911_I2C_SLAVE_ADDR, buf)
+        self.i2c.readfrom_into(GT911_I2C_SLAVE_ADDR, buf)
+        # Returns 128
         return buf[0]
         
     @status.setter
@@ -294,4 +316,4 @@ class GT911(object):
         self.data_buf[0] = (GT911_READ_COORD_ADDR & 0xFF00) >> 8
         self.data_buf[1] = GT911_READ_COORD_ADDR & 0xFF
         self.data_buf[2] = value
-        self.i2c.write(GT911_I2C_SLAVE_ADDR, self.data_buf, 3)
+        self.i2c.writeto(GT911_I2C_SLAVE_ADDR, self.data_buf[:3])  # , 3)
