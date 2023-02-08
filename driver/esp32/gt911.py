@@ -1,3 +1,29 @@
+"""
+Pure python GT911 touch driver for micropython, lvgl on esp32s3.
+
+usage:
+
+.. code-block::python
+    from machine import Pin,I2C
+    from gt911 import GT911
+
+    # [... init lvgl and lv_display here ...]
+
+    i2c = I2C(0, sda=Pin(17), scl=Pin(18), freq=444444)
+    touch = GT911(i2c)
+
+
+For I2C timeout on esp32s3, see this patch https://github.com/micropython/micropython/pull/9434/commits/8f479ab42e26e5b91db2ca079945d6e552798ab5
+from https://github.com/micropython/micropython/issues/7772
+in mpconfigboard.h, you'll need to define
+
+.. code-block::c
+    // (this constant is specific for every esp32 subvariant, there for s3)
+    #define I2C_LL_MAX_TIMEOUT  0x0000001FU
+
+
+"""
+
 from micropython import const
 import touch_base as _touch_base
 
