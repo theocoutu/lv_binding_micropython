@@ -1,5 +1,4 @@
-import espidf as _espidf
-import lvgl
+import espidf as _espidf  # NOQA
 import parallel_driver_base as _parallel_driver_base
 from parallel_driver_base import (
     COLOR_SPACE_BGR as _COLOR_SPACE_BGR,

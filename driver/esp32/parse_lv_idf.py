@@ -62,8 +62,6 @@ for i, line in enumerate(data):
 
 data = '\n'.join(data)
 
-data = data.replace('data->_del', 'data->del')
-data = data.replace('QSTR__del', 'QSTR_del')
 
 
 with open(path[:-4], 'w') as f:

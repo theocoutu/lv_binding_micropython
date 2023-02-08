@@ -50,6 +50,15 @@ from pycparser import c_parser, c_ast, c_generator
 
 argParser = ArgumentParser()
 argParser.add_argument(
+    "-N",
+    "--ignore",
+    dest="ignore",
+    default=[],
+    help="ignore functions",
+    metavar="<ignore function>",
+    action="append",
+)
+argParser.add_argument(
     "-I",
     "--include",
     dest="include",
@@ -101,6 +110,7 @@ argParser.add_argument("input", nargs="+")
 argParser.set_defaults(include=[], define=[], ep=None, input=[])
 args = argParser.parse_args()
 
+ignores = args.ignore
 module_name = args.module_name
 module_prefix = args.module_prefix if args.module_prefix else args.module_name
 
@@ -222,7 +232,7 @@ def get_name(type):
     if isinstance(
             type,
             c_ast.Struct
-            ) and type.name and type.name in explicit_structs:
+    ) and type.name and type.name in explicit_structs:
         return explicit_structs[type.name]
     if isinstance(type, c_ast.Struct):
         return type.name
@@ -276,7 +286,7 @@ base_obj_name = "obj"
 base_obj_type = "%s_%s_t" % (module_prefix, base_obj_name)
 lv_ext_pattern = re.compile(
     "^{prefix}_([^_]+)_ext_t".format(prefix=module_prefix)
-    )
+)
 lv_obj_pattern = re.compile(
     "^{prefix}_([^_]+)".format(prefix=module_prefix), re.IGNORECASE
 )
@@ -285,7 +295,7 @@ lv_func_pattern = re.compile(
 )
 create_obj_pattern = re.compile(
     "^{prefix}_(.+)_create$".format(prefix=module_prefix)
-    )
+)
 lv_method_pattern = re.compile(
     "^{prefix}_[^_]+_(.+)".format(prefix=module_prefix), re.IGNORECASE
 )
@@ -321,7 +331,7 @@ def sanitize(
             "class",
             "continue",
             "def",
-            "del",
+            # "del",
             "elif",
             "else",
             "except",
@@ -363,11 +373,13 @@ def simplify_identifier(id):
 
 
 def obj_name_from_ext_name(ext_name):
-    return lv_ext_pattern.match(ext_name).group(1)
+    res = lv_ext_pattern.match(ext_name).group(1)
+    return res if res != "del" else "delete"  # del is a resrved name, don't use it
 
 
 def obj_name_from_func_name(func_name):
-    return lv_obj_pattern.match(func_name).group(1)
+    res = lv_obj_pattern.match(func_name).group(1)
+    return res if res != "del" else "delete"  # del is a resrved name, don't use it
 
 
 def ctor_name_from_obj_name(obj_name):
@@ -396,7 +408,7 @@ def str_enum_to_str(str_enum):
 
 
 def user_data_from_callback_func(callback_func_name):
-    return "user_data"
+    return "user_data", "user_ctx"
     # res = lv_callback_type_pattern.match(callback_func_name)
     # return res.group(2) + '_user_data' if res and res.group(2) else None
 
@@ -408,7 +420,7 @@ def is_obj_ctor(func):
     # ctor must return a base_obj type
     if not lv_base_obj_pattern.match(
             get_type(func.type.type, remove_quals=True)
-            ):
+    ):
         return False
     # ctor must receive (at least) one base obj parameters
     args = func.type.args.params
@@ -457,7 +469,7 @@ for t in typedefs:
     if isinstance(t, c_ast.TypeDecl) and isinstance(
             t.type,
             c_ast.IdentifierType
-            ):
+    ):
         if t.declname != t.type.names[0]:
             synonym[t.declname] = t.type.names[0]
             # eprint('%s === %s' % (t.declname, t.type.names[0]))
@@ -569,7 +581,7 @@ def get_struct_functions(struct_name):
         return []
     base_struct_name = struct_name[:-2] if struct_name.endswith(
         "_t"
-        ) else struct_name
+    ) else struct_name
     # eprint("get_struct_functions %s: %s" % (struct_name, [get_type(func.type.args.params[0].type.type, remove_quals = True) for func in funcs if func.name.startswith(base_struct_name)]))
     # eprint("get_struct_functions %s: %s" % (struct_name, struct_aliases[struct_name] if struct_name in struct_aliases else ""))
 
@@ -1872,7 +1884,7 @@ for enum_def in enum_defs:
         member_name = (
             member.name[len(enum_name) + 1:] if len(
                 enum_name
-                ) > 0 else member.name
+            ) > 0 else member.name
         )
         if member_name[0].isdigit():
             member_name = "_" + member_name
@@ -1953,7 +1965,7 @@ def decl_to_callback(decl):
     elif isinstance(decl.type, c_ast.TypeDecl) and hasattr(
             decl.type.type,
             "names"
-            ):
+    ):
         func_typedef_name = decl.type.type.names[0]
         while func_typedef_name in synonym:
             # eprint('decl_to_callback: %s --> %s' % (func_typedef_name, synonym[func_typedef_name]))
@@ -1996,9 +2008,12 @@ def get_user_data(
             #     print('/* --> callback: %s First argument is %s */' % (gen.visit(func), struct_arg_type_name))
         if containing_struct:
             flatten_struct_decls = flatten_struct(containing_struct.decls)
-            user_data = user_data_from_callback_func(func_name)
-            user_data_found = user_data in [decl.name for decl in
-                                            flatten_struct_decls]
+            poss = user_data_from_callback_func(func_name)
+            for decl in flatten_struct_decls:
+                if decl.name in poss:
+                    user_data_found = True
+                    user_data = decl.name
+                    break
             # print('/* --> callback: user_data=%s user_data_found=%s containing_struct=%s */' % (user_data, user_data_found, containing_struct))
 
     if user_data_found:
@@ -2141,20 +2156,28 @@ def try_generate_struct(struct_name, struct):
                         decl,
                         "Missing 'user_data' member in struct '%s'" % struct_name
                     )
+
+            qstr_field = field = sanitize(decl.name)
+            if qstr_field == 'del':
+                qstr_field = 'delete'
+
             write_cases.append(
-                "case MP_QSTR_{field}: data->{field} = {cast}mp_lv_callback(dest[1], {lv_callback} ,MP_QSTR_{struct_name}_{field}, {user_data}); break; // converting to callback {type_name}".format(
+                "case MP_QSTR_{qstr_field}: data->{field} = {cast}mp_lv_callback(dest[1], {lv_callback} ,MP_QSTR_{struct_name}_{field}, {user_data}); break; // converting to callback {type_name}".format(
                     struct_name=struct_name,
-                    field=sanitize(decl.name),
+                    qstr_field=qstr_field,
+                    field=field,
                     lv_callback=lv_callback,
                     user_data=full_user_data_ptr,
                     type_name=type_name,
                     cast=cast,
                 )
             )
+
             read_cases.append(
-                "case MP_QSTR_{field}: dest[0] = mp_lv_funcptr(&mp_{funcptr}_mpobj, {cast}data->{field}, {lv_callback} ,MP_QSTR_{struct_name}_{field}, {user_data}); break; // converting from callback {type_name}".format(
+                "case MP_QSTR_{qstr_field}: dest[0] = mp_lv_funcptr(&mp_{funcptr}_mpobj, {cast}data->{field}, {lv_callback}, MP_QSTR_{struct_name}_{field}, {user_data}); break; // converting from callback {type_name}".format(
                     struct_name=struct_name,
-                    field=sanitize(decl.name),
+                    qstr_field=qstr_field,
+                    field=field,
                     lv_callback=lv_callback,
                     funcptr=lv_to_mp_funcptr[type_name],
                     user_data=full_user_data,
@@ -2169,7 +2192,7 @@ def try_generate_struct(struct_name, struct):
                     hasattr(
                         decl.type,
                         "quals"
-                        ) and "const" not in decl.type.quals
+                    ) and "const" not in decl.type.quals
             )
             # Arrays must be handled by memcpy, otherwise we would get "assignment to expression with array type" error
             if isinstance(decl.type, c_ast.ArrayDecl):
@@ -2313,10 +2336,10 @@ STATIC inline const mp_obj_type_t *get_mp_{sanitized_struct_name}_type()
     lv_mp_type[struct_name] = simplify_identifier(sanitized_struct_name)
     lv_mp_type["%s *" % struct_name] = simplify_identifier(
         sanitized_struct_name
-        )
+    )
     lv_mp_type["const %s *" % struct_name] = simplify_identifier(
         sanitized_struct_name
-        )
+    )
     # print('/* --> struct "%s" generated! */' % (struct_name))
     generated_structs[struct_name] = True  # Completed generating a struct
     return struct_name
@@ -2335,7 +2358,7 @@ def try_generate_array_type(type_ast):
     dim = gen.visit(type_ast.dim) if hasattr(
         type_ast,
         "dim"
-        ) and type_ast.dim else None
+    ) and type_ast.dim else None
     element_type = get_type(type_ast.type, remove_quals=True)
     qualified_element_type = gen.visit(type_ast.type)
     if element_type not in mp_to_lv or not mp_to_lv[element_type]:
@@ -2375,7 +2398,7 @@ def try_generate_array_type(type_ast):
     /*
      * Array convertors for {arr_name}
      */
-    
+
     GENMPY_UNUSED STATIC {struct_tag}{type} *{arr_to_c_convertor_name}(mp_obj_t mp_arr)
     {{
         mp_obj_t mp_len = mp_obj_len_maybe(mp_arr);
@@ -2464,7 +2487,7 @@ def try_generate_type(type_ast):
     if isinstance(type_ast, str):
         raise SyntaxError(
             "Internal error! try_generate_type argument is a string."
-            )
+        )
     # Handle the case of a pointer
     if isinstance(type_ast, c_ast.TypeDecl):
         return try_generate_type(type_ast.type)
@@ -2481,7 +2504,7 @@ def try_generate_type(type_ast):
         return mp_to_lv[type]
     if isinstance(type_ast, c_ast.ArrayDecl) and try_generate_array_type(
             type_ast
-            ):
+    ):
         return mp_to_lv[type]
     if isinstance(type_ast, (c_ast.PtrDecl, c_ast.ArrayDecl)):
         type = get_name(type_ast.type.type)
@@ -2491,7 +2514,7 @@ def try_generate_type(type_ast):
             try_generate_struct(
                 type,
                 structs[type]
-                ) if type in structs else None
+            ) if type in structs else None
         if (
                 isinstance(type_ast.type, c_ast.TypeDecl)
                 and isinstance(type_ast.type.type, c_ast.Struct)
@@ -2810,7 +2833,7 @@ def build_mp_func_arg(arg, index, func, obj_name):
                 else:
                     full_user_data = (
                         "&%s->%s" % (
-                        first_arg.name, user_data) if user_data else None
+                            first_arg.name, user_data) if user_data else None
                     )
                     if index == 0:
                         raise MissingConversionException(
@@ -2827,7 +2850,7 @@ def build_mp_func_arg(arg, index, func, obj_name):
                 arg_type,
                 "%s" % callback_name,
                 user_data_argument
-                )
+            )
             arg_metadata = {
                 "type": "callback",
                 "function": callback_metadata[callback_name],
@@ -2856,7 +2879,7 @@ def build_mp_func_arg(arg, index, func, obj_name):
         if arg_type not in mp_to_lv or not mp_to_lv[arg_type]:
             raise MissingConversionException(
                 "Missing conversion to %s" % arg_type
-                )
+            )
     arg_metadata = {"type": lv_mp_type[arg_type]}
     if arg.name:
         arg_metadata["name"] = arg.name
@@ -2875,7 +2898,7 @@ def build_mp_func_arg(arg, index, func, obj_name):
 def emit_func_obj(func_obj_name, func_name, param_count, func_ptr, is_static):
     print(
         """
-STATIC {builtin_macro}(mp_{func_obj_name}_mpobj, {param_count}, mp_{func_name}, {func_ptr});
+{comment}STATIC {builtin_macro}(mp_{func_obj_name}_mpobj, {param_count}, mp_{func_name}, {func_ptr});
     """.format(
             func_obj_name=func_obj_name,
             func_name=func_name,
@@ -2884,6 +2907,7 @@ STATIC {builtin_macro}(mp_{func_obj_name}_mpobj, {param_count}, mp_{func_name}, 
             builtin_macro="MP_DEFINE_CONST_LV_FUN_OBJ_STATIC_VAR"
             if is_static
             else "MP_DEFINE_CONST_LV_FUN_OBJ_VAR",
+            comment='//' if func_name in ignores else ''
         )
     )
 
@@ -2900,6 +2924,17 @@ def gen_mp_func(func, obj_name):
             % func.name
         )
         return
+
+    if func.name in ignores:
+        print(
+            """
+/*
+ * WARNING: %s was removed!
+ */
+        """
+            % func.name
+        )
+
     # print("/* gen_mp_func %s */" % func.name)
     generated_funcs[func.name] = False  # starting to generate the function
     func_metadata[func.name] = {"type": "function", "args": []}
@@ -2949,8 +2984,8 @@ def gen_mp_func(func, obj_name):
     if isinstance(
             func.type.type,
             c_ast.PtrDecl
-            ) and lv_func_returns_array.match(
-            func.name
+    ) and lv_func_returns_array.match(
+        func.name
     ):
         try_generate_array_type(func.type.type)
     # print('/* --> return_type = %s, qualified_return_type = %s\n%s */' % (return_type, qualified_return_type, func.type.type))
@@ -2973,19 +3008,20 @@ def gen_mp_func(func, obj_name):
             type=lv_to_mp[return_type], cast=cast
         )
         func_metadata[func.name]["return_type"] = lv_mp_type[return_type]
-    print(
-        """
+
+    print("""
 /*
  * {module_name} extension definition for:
  * {print_func}
  */
-
+{comment_open}
 STATIC mp_obj_t mp_{func}(size_t mp_n_args, const mp_obj_t *mp_args, void *lv_func_ptr)
 {{
     {build_args}
     {build_result}(({func_ptr})lv_func_ptr)({send_args});
     return {build_return_value};
 }}
+{comment_close}
 
  """.format(
             module_name=module_name,
@@ -3005,12 +3041,14 @@ STATIC mp_obj_t mp_{func}(size_t mp_n_args, const mp_obj_t *mp_args, void *lv_fu
             send_args=", ".join(
                 [
                     (arg.name if (hasattr(arg, "name") and arg.name) else (
-                                "arg%d" % i))
+                            "arg%d" % i))
                     for i, arg in enumerate(args)
                 ]
             ),
             build_result=build_result,
             build_return_value=build_return_value,
+            comment_open='/*' if func.name in ignores else '',
+            comment_close='*/' if func.name in ignores else ''
         )
     )
 
@@ -3039,7 +3077,7 @@ def gen_func_error(method, exp):
             method=gen.visit(method) if isinstance(
                 method,
                 c_ast.Node
-                ) else method,
+            ) else method,
             problem=exp,
         )
     )
@@ -3065,9 +3103,10 @@ def gen_obj_methods(obj_name):
         else []
     )
     members = [
-        "{{ MP_ROM_QSTR(MP_QSTR_{method_name}), MP_ROM_PTR(&mp_{method}_mpobj) }}".format(
+        "{comment}{{ MP_ROM_QSTR(MP_QSTR_{method_name}), MP_ROM_PTR(&mp_{method}_mpobj) }}".format(
             method=method.name,
             method_name=sanitize(method_name_from_func_name(method.name)),
+            comment='//' if method.name in ignores else ''
         )
         for method in get_methods(obj_name)
     ]
@@ -3391,9 +3430,10 @@ STATIC MP_DEFINE_CONST_DICT(mp_{sanitized_struct_name}_locals_dict, mp_{sanitize
                 sanitized_struct_name=sanitized_struct_name,
                 functions="".join(
                     [
-                        "{{ MP_ROM_QSTR(MP_QSTR_{name}), MP_ROM_PTR(&mp_{func}_mpobj) }},\n    ".format(
+                        "{comment}{{ MP_ROM_QSTR(MP_QSTR_{name}), MP_ROM_PTR(&mp_{func}_mpobj) }},\n    ".format(
                             name=sanitize(noncommon_part(f.name, struct_name)),
                             func=f.name,
+                            comment='//' if f.name in ignores else ''
                         )
                         for f in struct_funcs
                     ]
@@ -3518,8 +3558,10 @@ STATIC const mp_rom_map_elem_t {module_name}_globals_table[] = {{
         ),
         functions="".join(
             [
-                "{{ MP_ROM_QSTR(MP_QSTR_{name}), MP_ROM_PTR(&mp_{func}_mpobj) }},\n    ".format(
-                    name=sanitize(simplify_identifier(f.name)), func=f.name
+                "{comment}{{ MP_ROM_QSTR(MP_QSTR_{name}), MP_ROM_PTR(&mp_{func}_mpobj) }},\n    ".format(
+                    name=sanitize(simplify_identifier(f.name)),
+                    func=f.name,
+                    comment='//' if f.name in ignores else ''
                 )
                 for f in module_funcs
             ]
@@ -3618,6 +3660,7 @@ if args.metadata:
                            obj_names}
     metadata["functions"] = {
         simplify_identifier(f.name): func_metadata[f.name] for f in module_funcs
+        if f.name in func_metadata
     }
     metadata["enums"] = {
         get_enum_name(enum_name): obj_metadata[enum_name]

@@ -4,7 +4,7 @@ import lvgl as lv
 import machine
 
 
-class GenericParallelDisplay(object):
+class HX8264(object):
 
     def __init__(
         self,
@@ -48,9 +48,8 @@ class GenericParallelDisplay(object):
         self.vsync_polarity = vsync_polarity
         self.pclk_active_neg = pclk_active_neg
 
-        self.panel_handle = espidf.esp_lcd_panel_handle_t()
-        self.rgb_panel = None
-        
+        self.panel_handle = espidf.esp_lcd_panel_t()
+
         panel_config = espidf.heap_caps_calloc(
             1, 
             espidf.esp_lcd_rgb_panel_config_t.__SIZE__, 
@@ -73,6 +72,7 @@ class GenericParallelDisplay(object):
         self.disp_drv.ver_res = height
         self.disp_drv.flush_cb = self.flush_cb
         self.disp_drv.draw_buf = self.disp_draw_buf
+        self.rgb_panel = None
 
         if backlight is None:
             self.backlight = None
@@ -185,11 +185,14 @@ class GenericParallelDisplay(object):
         if ret != espidf.ESP.OK:
             raise RuntimeError("Failed rendering to display panel")
     
-        self.rgb_panel = espidf.esp_rgb_panel_container(self.panel_handle)
+        self.rgb_panel = espidf.esp_rgb_panel_containerof(self.panel_handle)
         
         self.disp_draw_buf.init(
-            self.rgb_panel.fb, None, self.width * self.height
+            self.rgb_panel.fb,
+            None,
+            self.width * self.height
         )
+
         self.disp_drv.register()
 
     def flush_cb(self, disp_drv, area, color_p):
@@ -202,4 +205,3 @@ class GenericParallelDisplay(object):
             color_p
         )
         lv.disp_flush_ready(disp_drv)
-

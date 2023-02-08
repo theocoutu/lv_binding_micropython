@@ -29,11 +29,13 @@ inline void gpio_init(void){}
 
 
 #if defined(SOC_LCD_RGB_SUPPORTED) && SOC_LCD_RGB_SUPPORTED
+#include "/home/kgschlosser/esp/components/esp_lcd/src/esp_lcd_rgb_panel.c"
 
-esp_rgb_panel_t *esp_rgb_panel_container(esp_lcd_panel_handle_t panel_handle) {
-    esp_rgb_panel_t *res = __containerof(panel_handle, esp_rgb_panel_t, base);
+esp_rgb_panel_t *esp_rgb_panel_containerof(esp_lcd_panel_handle_t panel_handle) {
+    esp_rgb_panel_t *res = __containerof(panel_handle, struct esp_rgb_panel_t, base);
     return res;
 }
+
 #endif
 
 

@@ -1,4 +1,3 @@
-
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_program(AWK awk mawk gawk)
 
@@ -21,7 +20,7 @@ function(lv_bindings)
     set(LV_MPY_METADATA ${LV_OUTPUT}.json)
 
     add_custom_command(
-        OUTPUT 
+        OUTPUT
             ${LV_PP}
         COMMAND
         ${CMAKE_C_COMPILER} -E -DPYCPARSER ${LV_COMPILE_OPTIONS} ${LV_PP_OPTIONS} "${LV_CFLAGS}" -I ${LV_BINDINGS_DIR}/pycparser/utils/fake_libc_include ${MICROPY_CPP_FLAGS} ${LV_INPUT} > ${LV_PP}
@@ -66,30 +65,9 @@ function(lv_bindings)
         set(LV_PP_FILTERED ${LV_PP})
     endif()
 
+    message("-- Generating MicroPython code: ${LV_OUTPUT}")
 
-
-    if(ESP_PLATFORM)
-        add_custom_command(
-            OUTPUT
-                ${LV_OUTPUT}.out
-            COMMAND
-                ${Python3_EXECUTABLE} ${LV_BINDINGS_DIR}/gen/gen_mpy.py ${LV_GEN_OPTIONS} -MD ${LV_MPY_METADATA} -E ${LV_PP_FILTERED} ${LV_INPUT} > ${LV_OUTPUT}.out || (rm -f ${LV_OUTPUT}.out && /bin/false)
-            DEPENDS
-                ${LV_BINDINGS_DIR}/gen/gen_mpy.py
-                ${LV_PP_FILTERED}
-            COMMAND_EXPAND_LISTS
-        )
-        add_custom_command(
-            OUTPUT
-                ${LV_OUTPUT}
-            COMMAND
-                ${Python3_EXECUTABLE} ${LV_BINDINGS_DIR}/driver/esp32/parse_lv_idf.py ${LV_OUTPUT}.out
-            DEPENDS
-                ${LV_BINDINGS_DIR}/driver/esp32/parse_lv_idf.py
-                ${LV_OUTPUT}.out
-        )
-    else()
-        add_custom_command(
+    add_custom_command(
         OUTPUT
             ${LV_OUTPUT}
         COMMAND
@@ -99,7 +77,7 @@ function(lv_bindings)
             ${LV_PP_FILTERED}
         COMMAND_EXPAND_LISTS
     )
-    endif()
+
 endfunction()
 
 # Definitions for specific bindings
@@ -109,6 +87,27 @@ set(LVGL_DIR ${LV_BINDINGS_DIR}/lvgl)
 set(LV_MP ${CMAKE_BINARY_DIR}/lv_mp.c)
 if(ESP_PLATFORM)
     set(LV_ESPIDF ${CMAKE_BINARY_DIR}/lv_espidf.c)
+endif()
+
+if(ESP_PLATFORM)
+    set(LVGL_IDF_COMPONENTS)
+
+    if(IDF_TARGET STREQUAL "esp32c3")
+        list(APPEND LVGL_IDF_COMPONENTS esp_lcd)
+        list(APPEND LVGL_IDF_COMPONENTS usb)
+    elseif(IDF_TARGET STREQUAL "esp32s2")
+        list(APPEND LVGL_IDF_COMPONENTS esp_lcd)
+        list(APPEND LVGL_IDF_COMPONENTS usb)
+    elseif(IDF_TARGET STREQUAL "esp32s3")
+        list(APPEND LVGL_IDF_COMPONENTS esp_lcd)
+        list(APPEND LVGL_IDF_COMPONENTS usb)
+    endif()
+
+    foreach(comp ${LVGL_IDF_COMPONENTS})
+        list(APPEND IDF_COMPONENTS ${comp})
+        micropy_gather_target_properties(__idf_${comp})
+    endforeach()
+
 endif()
 
 # Function for creating all specific bindings
@@ -132,6 +131,60 @@ function(all_lv_bindings)
     # ESPIDF bindings
 
     if(ESP_PLATFORM)
+        set(GEN_MPY_OPTIONS
+           -M espidf
+        )
+
+        if(IDF_TARGET STREQUAL "esp32c3")
+            LIST(APPEND GEN_MPY_OPTIONS
+                -N gpio_force_hold_all
+                -N gpio_force_unhold_all
+                -N esp_eth_phy_new_lan87xx
+                -N esp_eth_phy_new_lan8720
+                -N xt_clock_freq
+                -N lldesc_build_chain
+                -N esp_eth_phy_new_ksz8081
+                -N esp_eth_phy_new_ksz8041
+                -N esp_eth_phy_new_dp83848
+                -N esp_eth_phy_new_rtl8201
+                -N esp_eth_phy_new_ip101
+                -N lldesc_set_owner
+                -N lldesc_num2link
+            )
+        elseif(IDF_TARGET STREQUAL "esp32s2")
+            LIST(APPEND GEN_MPY_OPTIONS
+                -N gpio_force_hold_all
+                -N gpio_force_unhold_all
+                -N esp_eth_phy_new_lan87xx
+                -N esp_eth_phy_new_lan8720
+                -N xt_clock_freq
+                -N lldesc_build_chain
+                -N esp_eth_phy_new_ksz8081
+                -N esp_eth_phy_new_ksz8041
+                -N esp_eth_phy_new_dp83848
+                -N esp_eth_phy_new_rtl8201
+                -N esp_eth_phy_new_ip101
+                -N lldesc_set_owner
+                -N lldesc_num2link
+            )
+        elseif(IDF_TARGET STREQUAL "esp32s3")
+            LIST(APPEND GEN_MPY_OPTIONS
+                -N gpio_force_hold_all
+                -N gpio_force_unhold_all
+                -N esp_eth_phy_new_lan87xx
+                -N esp_eth_phy_new_lan8720
+                -N xt_clock_freq
+                -N lldesc_build_chain
+                -N esp_eth_phy_new_ksz8081
+                -N esp_eth_phy_new_ksz8041
+                -N esp_eth_phy_new_dp83848
+                -N esp_eth_phy_new_rtl8201
+                -N esp_eth_phy_new_ip101
+                -N lldesc_set_owner
+                -N lldesc_num2link
+            )
+        endif()
+
         file(GLOB_RECURSE LV_ESPIDF_HEADERS ${IDF_PATH}/components/*.h ${LV_BINDINGS_DIR}/driver/esp32/*.h)
         lv_bindings(
             OUTPUT
@@ -141,7 +194,7 @@ function(all_lv_bindings)
             DEPENDS
                 ${LV_ESPIDF_HEADERS}
             GEN_OPTIONS
-                 -M espidf
+                 ${GEN_MPY_OPTIONS}
             FILTER
                 i2s_ll.h
                 i2s_hal.h
@@ -151,15 +204,6 @@ function(all_lv_bindings)
                 soc/sens_struct.h
                 soc/rtc.h
                 driver/periph_ctrl.h
-                esp_eth/include/esp_eth.h
-                esp_eth/include/esp_eth_netif_glue.h
-                esp_eth/include/esp_eth_phy.h
-                esp_eth/include/esp_eth_com.h
-                esp_eth/include/esp_eth_mac.h
-                esp_eth/include/eth_phy_regs_struct.h
-                freertos/FreeRTOSConfig_arch.h
-                rom/lldesc.h
-                driver/rtc_io.h
         )
     endif(ESP_PLATFORM)
 
@@ -184,11 +228,4 @@ if(ESP_PLATFORM)
         ${LV_BINDINGS_DIR}/driver/esp32/sh2lib.c
         ${LV_ESPIDF}
     )
-
-    set(IDF_COMPONENTS
-        ${IDF_COMPONENTS}
-        esp_lcd
-        usb
-    )
-
 endif(ESP_PLATFORM)

@@ -141,15 +141,13 @@ static inline void get_ccount(int *ccount)
 #include "esp_http_client.h"
 #include "sh2lib.h"
 
-
+/*
 // This will allow for writing keyboard drivers and/or mouse drivers in Python
 #if CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32C6
 #include "usb/usb_helpers.h"
 #include "usb/usb_host.h"
 #include "usb/usb_types_ch9.h"
 #include "usb/usb_types_stack.h"
-
-
 
 //ENUM_USB_HOST_LIB_EVENT_FLAGS
 enum {
@@ -373,65 +371,86 @@ typedef struct {
     usb_isoc_packet_desc_t isoc_packet_desc[];      //< Descriptors for each Isochronous packet
 } usb_transfer_s;
 
-
+*/
 /*
 This is a dummy function in order to get gen_mpy to populate different
 structures and enumerations. The only way it works is they have to be added to
 a function.
 */
-static inline void usb_dummy_func(usb_iad_desc_t *param1, usb_transfer_s *param5){}
+//static inline void usb_dummy_func(usb_iad_desc_t *param1, usb_transfer_s *param5){}
 
 
-#endif
+//#endif
 
 //this exposes the esp_lcd functions, structures and enumerations to Micropython
 
 #if defined(SOC_LCD_RGB_SUPPORTED) && SOC_LCD_RGB_SUPPORTED
+
 #include "esp_lcd_panel_commands.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_rgb.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_interface.h"
-#include "esp_private/gdma.h"
-#include "esp_pm.h"
-#include "hal/dma_types.h"
+#include "esp_lcd_panel_io_interface.h"
+#include "esp_lcd_types.h"
+// #include "esp_private/gdma.h"
+// #include "esp_pm.h"
+// #include "hal/dma_types.h"
 #include "hal/lcd_hal.h"
 #include "hal/lcd_types.h"
 
-typedef struct {
-    esp_lcd_panel_t base;  // Base class of generic lcd panel
-    int panel_id;          // LCD panel ID
-    lcd_hal_context_t hal; // Hal layer object
-    size_t data_width;     // Number of data lines (e.g. for RGB565, the data width is 16)
-    size_t sram_trans_align;  // Alignment for framebuffer that allocated in SRAM
-    size_t psram_trans_align; // Alignment for framebuffer that allocated in PSRAM
-    int disp_gpio_num;     // Display control GPIO, which is used to perform action like "disp_off"
-    intr_handle_t intr;    // LCD peripheral interrupt handle
-    esp_pm_lock_handle_t pm_lock; // Power management lock
-    size_t num_dma_nodes;  // Number of DMA descriptors that used to carry the frame buffer
-    uint8_t *fb;           // Frame buffer
-    size_t fb_size;        // Size of frame buffer
-    int data_gpio_nums[SOC_LCD_RGB_DATA_WIDTH]; // GPIOs used for data lines, we keep these GPIOs for action like "invert_color"
-    uint32_t src_clk_hz;   // Peripheral source clock resolution
-    esp_lcd_rgb_timing_t timings;   // RGB timing parameters (e.g. pclk, sync pulse, porch width)
-    gdma_channel_handle_t dma_chan; // DMA channel handle
-    esp_lcd_rgb_panel_frame_trans_done_cb_t on_frame_trans_done; // Callback, invoked after frame trans done
-    void *user_ctx;                // Reserved user's data of callback functions
-    int x_gap;                      // Extra gap in x coordinate, it's used when calculate the flush window
-    int y_gap;                      // Extra gap in y coordinate, it's used when calculate the flush window
-    int lcd_clk_flags;              // LCD clock calculation flags
-    struct {
-        unsigned int disp_en_level: 1; // The level which can turn on the screen by `disp_gpio_num`
-        unsigned int stream_mode: 1;   // If set, the LCD transfers data continuously, otherwise, it stops refreshing the LCD when transaction done
-        unsigned int fb_in_psram: 1;   // Whether the frame buffer is in PSRAM
-    } flags;
-    dma_descriptor_t dma_nodes[]; // DMA descriptor pool of size `num_dma_nodes`
-} esp_rgb_panel_t;
+typedef struct esp_rgb_panel_t esp_rgb_panel_t;
 
+esp_rgb_panel_t *esp_rgb_panel_containerof(esp_lcd_panel_handle_t panel_handle);
 
-esp_rgb_panel_t *esp_rgb_panel_container(esp_lcd_panel_handle_t panel_handle);
-
+//LCD_CMD
+enum {
+    ENUM_LCD_CMD_NOP = LCD_CMD_NOP,
+    ENUM_LCD_CMD_SWRESET = LCD_CMD_SWRESET,
+    ENUM_LCD_CMD_RDDID = LCD_CMD_RDDID,
+    ENUM_LCD_CMD_RDDST = LCD_CMD_RDDST,
+    ENUM_LCD_CMD_RDDPM = LCD_CMD_RDDPM,
+    ENUM_LCD_CMD_RDD_MADCTL = LCD_CMD_RDD_MADCTL,
+    ENUM_LCD_CMD_RDD_COLMOD = LCD_CMD_RDD_COLMOD,
+    ENUM_LCD_CMD_RDDIM = LCD_CMD_RDDIM,
+    ENUM_LCD_CMD_RDDSM = LCD_CMD_RDDSM,
+    ENUM_LCD_CMD_RDDSR = LCD_CMD_RDDSR,
+    ENUM_LCD_CMD_SLPIN = LCD_CMD_SLPIN,
+    ENUM_LCD_CMD_SLPOUT = LCD_CMD_SLPOUT,
+    ENUM_LCD_CMD_PTLON = LCD_CMD_PTLON,
+    ENUM_LCD_CMD_NORON = LCD_CMD_NORON,
+    ENUM_LCD_CMD_INVOFF = LCD_CMD_INVOFF,
+    ENUM_LCD_CMD_INVON = LCD_CMD_INVON,
+    ENUM_LCD_CMD_GAMSET = LCD_CMD_GAMSET,
+    ENUM_LCD_CMD_DISPOFF = LCD_CMD_DISPOFF,
+    ENUM_LCD_CMD_DISPON = LCD_CMD_DISPON,
+    ENUM_LCD_CMD_CASET = LCD_CMD_CASET,
+    ENUM_LCD_CMD_RASET = LCD_CMD_RASET,
+    ENUM_LCD_CMD_RAMWR = LCD_CMD_RAMWR,
+    ENUM_LCD_CMD_RAMRD = LCD_CMD_RAMRD,
+    ENUM_LCD_CMD_PTLAR = LCD_CMD_PTLAR,
+    ENUM_LCD_CMD_VSCRDEF = LCD_CMD_VSCRDEF,
+    ENUM_LCD_CMD_TEOFF = LCD_CMD_TEOFF,
+    ENUM_LCD_CMD_TEON = LCD_CMD_TEON,
+    ENUM_LCD_CMD_MADCTL = LCD_CMD_MADCTL,
+    ENUM_LCD_CMD_MH_BIT = LCD_CMD_MH_BIT,
+    ENUM_LCD_CMD_BGR_BIT = LCD_CMD_BGR_BIT,
+    ENUM_LCD_CMD_ML_BIT = LCD_CMD_ML_BIT,
+    ENUM_LCD_CMD_MV_BIT = LCD_CMD_MV_BIT,
+    ENUM_LCD_CMD_MX_BIT = LCD_CMD_MX_BIT,
+    ENUM_LCD_CMD_MY_BIT = LCD_CMD_MY_BIT,
+    ENUM_LCD_CMD_VSCSAD = LCD_CMD_VSCSAD,
+    ENUM_LCD_CMD_IDMOFF = LCD_CMD_IDMOFF,
+    ENUM_LCD_CMD_IDMON = LCD_CMD_IDMON,
+    ENUM_LCD_CMD_COLMOD = LCD_CMD_COLMOD,
+    ENUM_LCD_CMD_RAMWRC = LCD_CMD_RAMWRC,
+    ENUM_LCD_CMD_RAMRDC = LCD_CMD_RAMRDC,
+    ENUM_LCD_CMD_STE = LCD_CMD_STE,
+    ENUM_LCD_CMD_GDCAN = LCD_CMD_GDCAN,
+    ENUM_LCD_CMD_WRDISBV = LCD_CMD_WRDISBV,
+    ENUM_LCD_CMD_RDDISBV = LCD_CMD_RDDISBV,
+};
 #endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -542,7 +561,6 @@ enum {
     ENUM_SPI_TRANS_VARIABLE_CMD = SPI_TRANS_VARIABLE_CMD,
     ENUM_SPI_TRANS_VARIABLE_ADDR = SPI_TRANS_VARIABLE_ADDR,
 };
-
 
 enum {
     ENUM_MALLOC_CAP_EXEC = MALLOC_CAP_EXEC,

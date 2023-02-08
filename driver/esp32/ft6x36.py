@@ -1,8 +1,7 @@
-import lvgl as lv
+import touch_base as _touch_base
 from micropython import const
-import espidf as _espidf  # NOQA
 
-FT6236_I2C_SLAVE_ADDR = const(0x38)
+FT6x36_I2C_SLAVE_ADDR = const(0x38)
 
 # ** Maximum border values of the touchscreen pad that the chip can handle **
 FT6X36_MAX_WIDTH = const(800)
@@ -134,89 +133,45 @@ FT6X36_PANEL_ID_REG = const(0xA8)
 FT6X36_OPMODE_REG = const(0xBC)
 
 
-class ft6x36_touch_t:
+class FT6x36(_touch_base.TouchBase):
 
-    def __init__(self, last_x, last_y, current_state):
-        self.last_x = last_x  # int16_t
-        self.last_y = last_y  # int16_t
-        self.current_state = current_state  # lv_indev_state_t
-
-
-class FT6x36:
-
-    def _i2c_read8(self, register_addr):  # uint8_t, uint8_t, uint8_t*
-        buf = bytearray(1)
-        self._i2c.readfrom_mem_into(self.dev_addr, register_addr, buf)
-        return buf[0]
-
-    def get_gesture_id(self):  # -> uint8_t
-        return self._i2c_read8(FT6X36_GEST_ID_REG)  # esp_err_t
-
-    def __init__(
-            self,
-            i2c,
-            dev_addr=FT6236_I2C_SLAVE_ADDR,
-            swap_xy=True,
-            invert_x=False,
-            invert_y=False
-    ):
-
-        if not lv.is_initialized():
-            lv.init()
-
-        disp = lv.disp_t.__cast__(None)  # NOQA
-        width = disp.get_hor_res()
-        height = disp.get_ver_res()
-
-        # -1 coordinates to designate it was never touched
-        self.touch_inputs = ft6x36_touch_t(-1, -1, lv.INDEV_STATE.RELEASED)
-        self.touch_count = 0
-        self.touch_cycles = 0
-        self.start_time_ptr = _espidf.C_Pointer()
-        self.end_time_ptr = _espidf.C_Pointer()
-        self.dev_addr = dev_addr
-        self.swap_xy = swap_xy
-        self.invert_x = invert_x
-        self.invert_y = invert_y
+    def __init__(self, i2c):
         self._i2c = i2c
-        self.height = height
-        self.width = width
+        self.data_buf = bytearray(5)
+        self.mv = memoryview(self.data_buf)
+        super().__init__()
 
-        data_buf = self._i2c_read8(FT6X36_PANEL_ID_REG)
+    def init(self):
+        data_buf = self._read(FT6X36_PANEL_ID_REG)
         print("Device ID: 0x%02x" % data_buf)
 
-        data_buf = self._i2c_read8(FT6X36_CHIPSELECT_REG)
+        data_buf = self._read(FT6X36_CHIPSELECT_REG)
         print("Chip ID: 0x%02x" % data_buf)
 
-        data_buf = self._i2c_read8(FT6X36_DEV_MODE_REG)
+        data_buf = self._read(FT6X36_DEV_MODE_REG)
         print("Device mode: 0x%02x" % data_buf)
 
-        data_buf = self._i2c_read8(FT6X36_FIRMWARE_ID_REG)
+        data_buf = self._read(FT6X36_FIRMWARE_ID_REG)
         print("Firmware ID: 0x%02x" % data_buf)
 
-        data_buf = self._i2c_read8(FT6X36_RELEASECODE_REG)
+        data_buf = self._read(FT6X36_RELEASECODE_REG)
         print("Release code: 0x%02x" % data_buf)
 
-        self.data_buf = bytearray(5)
-
-        indev_drv = lv.indev_drv_t()
-        indev_drv.init()  # NOQA
-        indev_drv.type = lv.INDEV_TYPE.POINTER
-        indev_drv.read_cb = self.read
-        indev_drv.register()  # NOQA
+    def _read(self, register_addr):
+        self._i2c.readfrom_mem_into(FT6x36_I2C_SLAVE_ADDR, register_addr, self.mv[:1])
+        return self.data_buf[0]
 
     def _get_coords(self):
         self._i2c.readfrom_mem_into(
-            self.dev_addr,
+            FT6x36_I2C_SLAVE_ADDR,
             FT6X36_TD_STAT_REG,
-            self.data_buf
+            self.mv
         )
-        # uint8_t - Number of detected touch points
+
         touch_pnt_cnt = self.data_buf[0]
 
-        # ignore no touch & multi touch
         if touch_pnt_cnt != 1:
-            return None
+            return
 
         x = (
             ((self.data_buf[1] & FT6X36_MSB_MASK) << 8) |
@@ -227,46 +182,4 @@ class FT6x36:
             (self.data_buf[4] & FT6X36_LSB_MASK)
         )
 
-        if self.swap_xy:
-            x, y = y, x
-
-        if self.invert_x:
-            x = self.width - x
-
-        if self.invert_y:
-            y = self.height - y
-
-        if y < 0:
-            y += abs(y)
-
         return x, y
-
-    def read(self, _, data):
-        _espidf.get_ccount(self.start_time_ptr)
-        coords = self._get_coords()
-        _espidf.get_ccount(self.end_time_ptr)
-
-        if self.end_time_ptr.int_val > self.start_time_ptr.int_val:
-            self.touch_cycles += (
-                self.end_time_ptr.int_val - self.start_time_ptr.int_val
-            )
-            self.touch_count += 1
-
-        # ignore no touch & multi touch
-        if coords is None:
-            if self.touch_inputs.current_state != lv.INDEV_STATE.RELEASED:
-                self.touch_inputs.current_state = lv.INDEV_STATE.RELEASED
-
-            data.point.x = self.touch_inputs.last_x
-            data.point.y = self.touch_inputs.last_y
-            data.state = self.touch_inputs.current_state
-            return False
-
-        self.touch_inputs.current_state = lv.INDEV_STATE.PRESSED
-        self.touch_inputs.last_x = coords[0]
-        self.touch_inputs.last_y = coords[1]
-
-        data.point.x = self.touch_inputs.last_x
-        data.point.y = self.touch_inputs.last_y
-        data.state = self.touch_inputs.current_state
-        return False
